@@ -42,7 +42,7 @@ def get_model(point_cloud, is_training, bn_decay=None):
 
     with tf.variable_scope('transform_net2') as sc:
         transform = feature_transform_net(net['pc_conv2'], is_training, bn_decay, K=64)
-    end_points['transform'] = transform
+    end_points['transform_64'] = transform
     net_transformed = tf.matmul(tf.squeeze(net['pc_conv2'], axis=[2]), transform)
     net_transformed = tf.expand_dims(net_transformed, [2])
     net['pc_transformed_64'] = net_transformed
@@ -86,7 +86,7 @@ def get_loss(pred, label, end_points, reg_weight=0.001):
     tf.summary.scalar('classify loss', classify_loss)
 
     # Enforce the transformation as orthogonal matrix
-    transform = end_points['transform'] # BxKxK
+    transform = end_points['transform_64'] # BxKxK
     K = transform.get_shape()[1].value
     mat_diff = tf.matmul(transform, tf.transpose(transform, perm=[0,2,1]))
     mat_diff -= tf.constant(np.eye(K), dtype=tf.float32)
