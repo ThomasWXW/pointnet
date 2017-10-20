@@ -78,6 +78,92 @@ def get_model(point_cloud, is_training, bn_decay=None):
     return net, end_points
 
 
+def get_model_add_global(point_cloud, is_training, bn_decay=None):
+    """ Classification PointNet, input is BxNx3, output Bx40 """
+    batch_size = point_cloud.get_shape()[0].value
+    num_point = point_cloud.get_shape()[1].value
+    end_points = {}
+    net = {}
+    net['pc_input'] = point_cloud
+
+    with tf.variable_scope('transform_net1') as sc:
+        transform = input_transform_net(point_cloud, is_training, bn_decay, K=3)
+    end_points['transform_3'] = transform
+    point_cloud_transformed = tf.matmul(point_cloud, transform)
+
+    input_image = tf.expand_dims(point_cloud_transformed, -1)
+    net['pc_transformed_3'] = input_image
+
+    net['pc_conv1'] = tf_util.conv2d(input_image, 64, [1,3],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv1', bn_decay=bn_decay)
+    net['pc_conv2'] = tf_util.conv2d(net['pc_conv1'], 64, [1,1],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv2', bn_decay=bn_decay)
+
+    with tf.variable_scope('transform_net2') as sc:
+        transform = feature_transform_net(net['pc_conv2'], is_training, bn_decay, K=64)
+    end_points['transform_64'] = transform
+    net_transformed = tf.matmul(tf.squeeze(net['pc_conv2'], axis=[2]), transform)
+    net_transformed = tf.expand_dims(net_transformed, [2])
+    net['pc_transformed_64'] = net_transformed
+
+    net['pc_conv3'] = tf_util.conv2d(net_transformed, 64, [1,1],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv3', bn_decay=bn_decay)
+    net['pc_conv4'] = tf_util.conv2d(net['pc_conv3'], 128, [1,1],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv4', bn_decay=bn_decay)
+    net['pc_conv5'] = tf_util.conv2d(net['pc_conv4'], 1024, [1,1],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv5', bn_decay=bn_decay)
+
+    net['pc_conv6'] = tf_util.conv2d(net['pc_conv5'], 1024, [1,1],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv6', bn_decay=bn_decay)
+    
+    net['pc_conv7'] = tf_util.conv2d(net['pc_conv6'], 1024, [1,1],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv7', bn_decay=bn_decay)
+
+    # Symmetric function: max pooling
+    global_feat = tf_util.max_pool2d(net['pc_conv7'], [num_point,1],
+                             padding='VALID', scope='maxpool')
+
+    global_feat_expand = tf.tile(global_feat, [1, num_point, 1, 1])
+
+    add_feat = tf.add(net['pc_conv5'], global_feat_expand, name = 'add')
+
+    net['pc_conv8'] = tf_util.conv2d(add_feat, 1024, [1,1],
+                         padding='VALID', stride=[1,1],
+                         bn=True, is_training=is_training,
+                         scope='conv8', bn_decay=bn_decay)
+
+    net['pc_maxpool'] = tf_util.max_pool2d(net['pc_conv8'], [num_point,1],
+                             padding='VALID', scope='maxpool')
+
+    net['pc_maxpool'] = tf.reshape(net['pc_maxpool'], [batch_size, -1])
+    net['pc_fc1'] = tf_util.fully_connected(net['pc_maxpool'], 512, bn=True, is_training=is_training,
+                                  scope='fc1', bn_decay=bn_decay)
+    net['pc_dp1'] = tf_util.dropout(net['pc_fc1'], keep_prob=0.7, is_training=is_training,
+                          scope='dp1')
+    net['pc_fc2'] = tf_util.fully_connected(net['pc_dp1'], 256, bn=True, is_training=is_training,
+                                  scope='fc2', bn_decay=bn_decay)
+    net['pc_dp2'] = tf_util.dropout(net['pc_fc2'], keep_prob=0.7, is_training=is_training,
+                          scope='dp2')
+    net['pc_fc3'] = tf_util.fully_connected(net['pc_dp2'], 40, activation_fn=None, scope='fc3')
+
+    return net, end_points
+
+
+
 def get_loss(pred, label, end_points, reg_weight=0.001):
     """ pred: B*NUM_CLASSES,
         label: B, """

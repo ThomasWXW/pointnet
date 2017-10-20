@@ -15,6 +15,7 @@ import numpy as Math
 #import pylab as Plot
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D 
+import sys
 
 def Hbeta(D = Math.array([]), beta = 1.0):
 	"""Compute the perplexity and the P-row for a specific value of the precision of a Gaussian distribution."""
@@ -110,7 +111,7 @@ def tsne(X = Math.array([]), no_dims = 2, initial_dims = 50, perplexity = 30.0):
 	# Initialize variables
 	X = pca(X, initial_dims).real;
 	(n, d) = X.shape;
-	max_iter = 1000;
+	max_iter = 300;
 	initial_momentum = 0.5;
 	final_momentum = 0.8;
 	eta = 500;
@@ -126,6 +127,8 @@ def tsne(X = Math.array([]), no_dims = 2, initial_dims = 50, perplexity = 30.0):
 	P = P / Math.sum(P);
 	P = P * 4;									# early exaggeration
 	P = Math.maximum(P, 1e-12);
+
+	last_err = None
 
 	# Run iterations
 	for iter in range(max_iter):
@@ -156,11 +159,16 @@ def tsne(X = Math.array([]), no_dims = 2, initial_dims = 50, perplexity = 30.0):
 		# Compute current value of cost function
 		if (iter + 1) % 10 == 0:
 			C = Math.sum(P * Math.log(P / Q));
-			print("Iteration ", (iter + 1), ": error is ", C)
+			#print("Iteration ", (iter + 1), ": error is ", C)
+			sys.stdout.write('.')
+			sys.stdout.flush()
+
+		if iter == max_iter - 1:
+			print("tsne done.")
 
 		# Stop lying about P-values
 		if iter == 100:
-			P = P / 4;
+			P = P / 4
 
 	# Return solution
 	return Y;
