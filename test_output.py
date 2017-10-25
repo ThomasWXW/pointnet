@@ -23,7 +23,7 @@ parser.add_argument('--gpu', type=int, default=0, help='GPU to use [default: GPU
 parser.add_argument('--model', default='pointnet_cls_re', help='Model name: pointnet_cls or pointnet_cls_basic [default: pointnet_cls]')
 parser.add_argument('--batch_size', type=int, default=4, help='Batch Size during training [default: 1]')
 parser.add_argument('--num_point', type=int, default=1024, help='Point Number [256/512/1024/2048] [default: 1024]')
-parser.add_argument('--model_path', default='log/model.ckpt', help='model checkpoint file path [default: log/model.ckpt]')
+parser.add_argument('--model_path', default='log_re/model.ckpt', help='model checkpoint file path [default: log/model.ckpt]')
 parser.add_argument('--dump_dir', default='dump_re', help='dump folder path [dump]')
 parser.add_argument('--visu', action='store_true', help='Whether to dump image for error case [default: False]')
 parser.add_argument('--inputfile', default='None', help='Please specify which point cloud to evaluate')
@@ -64,7 +64,7 @@ def evaluate(num_votes=1):
         is_training_pl = tf.placeholder(tf.bool, shape=())
 
         #get model
-        net, end_points = MODEL.get_model(pointclouds_pl, is_training_pl)
+        net, end_points = MODEL.get_model_add_global(pointclouds_pl, is_training_pl)
         loss = MODEL.get_loss(net['pc_fc3'], labels_pl, end_points)
 
         # Add ops to save and restore all the variables.
@@ -151,7 +151,7 @@ def eval_all_pointcloud(sess, ops, num_votes=1, topk=1):
 
 def eval_one_pointcloud(sess, ops, num_votes=1, topk=1):
     id_count = 0
-    id_pred = 200
+    id_pred = 1200
     error_cnt = 0
     is_training = False
     total_correct = 0
